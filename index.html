@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<head>
+<title>Police Statements</title>
+<style>
+@font-face {
+  font-family: 'MicroExtendFLF';
+  src: url('fonts/MicroExtendFLF-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'MicroExtendFLF';
+  font-weight: bold;
+  background-color: #333;
+  overflow-x: hidden;
+}
+#svg {
+  position: relative;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100vw;
+  height: 350px;
+}
+#title {
+  color: #555;
+  padding: 10px;
+  width: 100vw;
+  text-align: center;
+  margin-top: 50px;
+}
+#description {
+  font-family: 'Helvetica Neue';
+  text-align: justify;
+  font-weight: 300;
+  font-size: 12px;
+  color: #999;
+  width: 60vw;
+  margin: 0 auto;
+}
+a {
+  color: #bbb;
+  text-decoration: none;
+}
+#tweets {
+  color: #fff;
+  font-family: 'Helvetica Neue';
+  font-weight: 300;
+  font-size: 12px;
+  width: 80vw;
+  margin: 0 auto;
+  text-align: center;
+  margin-bottom: 100px;
+}
+.tweet {
+  text-align: left;
+  display: inline-block;
+  width: 300px;
+  padding: 10px;
+}
+.linked {
+  color: #ff0b0b;
+}
+#footer {
+  background-color: #333;
+  padding: 10px;
+  color: #999;
+  font-family: 'Helvetica Neue';
+  font-weight: 300;
+  font-size: 12px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 13px;
+}
+</style>
+</head>
+<script src='js/d3.min.js'></script>
+<script src='js/jquery-3.3.1.min.js'></script>
+<body>
+
+  <div id='title'>POLICE STATEMENTS</div>
+  <div id='description'>
+    Since May 2018, the LAPD has released videos documenting <a target='_blank' href='http://www.lapdonline.org/use_of_force/content_basic_view/63383'>officer-involved shootings (O.I.S.)</a> as they occur.
+    These 'Critical Incident Reports' use CCTV and body camera footage, along with voiceovers from LAPD personnel, to describe the shootings.
+    The LAPD also publicizes the shootings through its Twitter account, <a target='_blank' href='http://twitter.com/LAPDHQ'>@LAPDHQ</a>.
+    This page documents the existence of reported officer-involved shootings, alongside the publicity that the LAPD gives to each shooting via Twitter.
+    <span style='color: #f94e4e'>Red bars</span> indicate tweets that mention officer-involved shootings or their corresponding Critical Incident Reports.
+    <span style='color: #f94e4e'>Red arcs</span> indicate whenever an officer-involved shooting was tweeted about at a later date.
+  </div>
+  <svg id='svg'></svg>
+  <div id='tweets'></div>
+  <div id='footer'>Updated as of November 13, 2018. The tweets come from <a href='http://twitter.com/LAPDHQ'>@LAPDHQ</a> and are presented here in accordance with the <a target='_blank' href='https://developer.twitter.com/en/developer-terms/agreement-and-policy#id34'>Twitter Developer Terms of Service</a>. <a target='_blank' href='https://docs.google.com/forms/d/e/1FAIpQLSdroQY3MpkN6Pw1QN06t7_Srq7CUD4RLpqNJyE-gehLlHwEgA/viewform?usp=sf_link'>Click here</a> to submit a concern.</div>
+
+<script>
+
+var svg = d3.select( '#svg' )
+var offset = 0
+
+$.getJSON( 'data/data.json', function( json ) {
+
+  var dictionary = {}
+
+  for (var i = 0; i < json.length; i++) {
+    dictionary[json[i].date] = json[i]
+  }
+
+  var xscale = d3.scaleTime()
+    .domain([
+      new Date( json[0].date ),
+      new Date( json[json.length - 1].date )
+    ])
+    .range([
+      window.innerWidth * 1/8,
+      window.innerWidth * 7/8
+    ])
+
+  svg.on('mousemove', function(e){
+    var mouse = d3.mouse(this)
+    var x = mouse[0]
+    var y = mouse[1]
+    var date = d3.timeDay.round(xscale.invert(x))
+    x = xscale(date)
+    date = new Date(date)
+    var month = (date.getMonth() + 1).toString()
+    if (month.length == 1) month = '0' + month
+    var day = (date.getDate()).toString()
+    if (day.length == 1) day = '0' + day
+    date = month + '/' + day + '/' + date.getFullYear()
+    if ( y < offset + 100 || y > offset + 200
+      || x < window.innerWidth * 1/8 || x > window.innerWidth * 7/8) return
+    svg.selectAll('.cursor').remove()
+    svg.append('line')
+      .attr('x1', x)
+      .attr('x2', x)
+      .attr('y1', offset + 100 + yscale(0))
+      .attr('y2', offset + 50 + yscale(20))
+      .attr('stroke', '#fff')
+      .attr('opacity', 0.5)
+      .attr('class', 'cursor')
+    svg.append('text')
+      .attr('x', 4 + x)
+      .attr('y', 6 + offset + 50 + yscale(20))
+      .text(date)
+      .attr('font-size', '8px')
+      .attr('fill', '#fff')
+      .attr('opacity', 0.5)
+      .attr('class', 'cursor')
+    if (dictionary[date].ois != 0) svg.append('text')
+      .attr('x', 4 + x)
+      .attr('y', 16 + offset + 50 + yscale(20))
+      .text(dictionary[date].ois.name)
+      .attr('font-size', '8px')
+      .attr('fill', '#ff0b0b')
+      .attr('class', 'cursor')
+    $('.tweet,.header').remove()
+    if (dictionary[date].ois != 0) {
+      var text = "<span class='linked'>There was an officer-involved shooting on this date.</span>"
+      if (dictionary[date].ois.report != null) text += "<br>The LAPD published a <a target='_blank' href='" + dictionary[date].ois.report + "'>report</a> on this shooting. "
+      if (dictionary[date].ois.video != null) text += "They also published a <a target='_blank' href='" + dictionary[date].ois.video + "'>video report</a>. "
+      // if (dictionary[date].tweets.length > 0) text += "<br>You can click on the dates below to view the tweets on Twitter."
+      $('#tweets').append("<div class='header'>" + text + "</div>")
+    }
+    /*
+    var added = {}
+    for (var i = 0; i < dictionary[date].linked_tweets.length; i++) {
+      var tweet = dictionary[date].linked_tweets[i]
+      if (tweet.time == null) continue
+      var time = tweet.time == date ? tweet.time : "<span class='linked'>" + tweet.time + "</span>"
+      $('#tweets').append("<div class='tweet'><a target='_blank' href='http://twitter.com/LAPDHQ/status/" + tweet.tweetId + "'>" + time + '</a>— ' + tweet.text + "</div>")
+      added[tweet.tweetId] = true
+    }
+    for (var i = 0; i < dictionary[date].tweets.length; i++) {
+      var tweet = dictionary[date].tweets[i]
+      if (added[tweet.tweetId]) continue
+      $('#tweets').append("<div class='tweet'><a target='_blank' href='http://twitter.com/LAPDHQ/status/" + tweet.tweetId + "'>" + tweet.time + '</a>— ' + tweet.text + "</div>")
+    }
+    */
+  })
+
+  var yscale = d3.scaleLinear()
+    .domain([0, 20])
+    .range([offset + 98, offset + 0])
+
+  var arc_radius = function ( d, linked_tweet ) {
+
+    if ( linked_tweet == null ) return 0
+
+    var date1 = d.date
+    var date2 = linked_tweet.time
+
+    return (xscale(new Date(date2)) - xscale(new Date(date1))) / 2
+
+  }
+
+  var arc = d3.arc()
+    .innerRadius(function(d){ return arc_radius(d, d.linked_tweets[0]) })
+    .outerRadius(function(d){ return arc_radius(d, d.linked_tweets[0]) + 0.1 })
+    .startAngle(Math.PI / 2)
+    .endAngle(Math.PI / 2 * 3)
+
+  var dates = svg.selectAll('.event')
+    .data(json)
+  var dates_enter = dates.enter().append('g')
+    .attr('class', 'date')
+    .attr('transform', function(d){ return 'translate(' + xscale(new Date(d.date)) + ',100)' })
+  dates_enter.append('line')
+    .attr('x1', 0)
+    .attr('x2', 0)
+    .attr('y1', offset + 100)
+    .attr('y2', offset + 102)
+    .attr('stroke', '#fff')
+  dates_enter.append('line')
+    .filter(function(d){ return d.ois != 0 })
+    .attr('x1', 0)
+    .attr('x2', 0)
+    .attr('y1', offset + 104)
+    .attr('y2', offset + 110)
+    .attr('stroke', '#ff0b0b')
+  dates_enter.append('line')
+    .attr('x1', 0)
+    .attr('x2', 0)
+    .attr('y1', function(d){ return yscale(d.tweets.length) })
+    .attr('y2', offset + 98)
+    .attr('stroke', '#fff')
+  dates_enter.append('line')
+    .filter(function(d){ return d.linked_tweets.length != 0 })
+    .attr('x1', 0)
+    .attr('x2', 0)
+    .attr('y1', offset + 98)
+    .attr('y2', function(d){
+      return offset + 98 - (d.linked_tweets.length * 4)
+    })
+    .attr('stroke', '#ff0b0b')
+  for (var t = 0; t < 20; t++) {
+    dates_enter.append('path')
+      .filter(function(d){ return d.linked_tweets.length != 0 })
+      .attr('d', function(d){
+        arc.innerRadius(function(d){ return arc_radius(d, d.linked_tweets[t]) })
+        arc.outerRadius(function(d){ return arc_radius(d, d.linked_tweets[t]) + 0.1 })
+        return arc(d)
+      })
+      .attr('transform', function(d){ return 'translate(' + arc_radius(d, d.linked_tweets[t]) + ', ' + (offset + 112) + ')' })
+      .attr('stroke', '#ff0b0b')
+      .attr('opacity', 0.5)
+  }
+
+  svg.append('text')
+    .attr('fill', '#fff')
+    .text('tweets')
+    .attr('font-size', '8px')
+    .attr('text-anchor', 'end')
+    .attr('y', offset + 100)
+    .attr('x', -10 + window.innerWidth * 1/8)
+  for (var i = 0; i < 25; i += 5) {
+    if (i != 20) svg.append('text')
+      .attr('fill', '#fff')
+      .text(i)
+      .attr('font-size', '8px')
+      .attr('text-anchor', 'end')
+      .attr('y', 100 + yscale(i))
+      .attr('x', -10 + window.innerWidth * 1/8)
+      .attr('opacity', 0.2)
+    svg.append('line')
+      .attr('x1', window.innerWidth * 1/8)
+      .attr('x2', window.innerWidth * 7/8)
+      .attr('y1', 100 + yscale(i))
+      .attr('y2', 100 + yscale(i))
+      .attr('opacity', 0.1)
+      .attr('stroke', '#fff')
+  }
+  svg.append('text')
+    .attr('fill', '#ff0b0b')
+    .text('shooting')
+    .attr('font-size', '8px')
+    .attr('text-anchor', 'end')
+    .attr('y', offset + 209)
+    .attr('x', -8 + window.innerWidth * 1/8)
+})
+
+</script>
+</body>
+</html>
